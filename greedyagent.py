@@ -1,4 +1,5 @@
-# import numpy as np
+import numpy as np
+import heapq
 # Run a BFS to find the path from start to goal
 def run_bfs(map, start, goal):
     n_rows = len(map)
@@ -36,6 +37,45 @@ def run_bfs(map, start, goal):
                 return actions[t], d[next_pos]
         t += 1
     return 'S', d[start]
+
+def manhattan(p1, p2):
+    return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
+
+# def run_astar(map, start, goal):
+#     n_rows = len(map)
+#     n_cols = len(map[0])
+
+#     open_set = []
+#     heapq.heappush(open_set, (manhattan(start, goal), 0, start, []))  # (f, g, pos, path)
+#     visited = set()
+
+#     while open_set:
+#         f, g, current, path = heapq.heappop(open_set)
+#         if current in visited:
+#             continue
+#         visited.add(current)
+
+#         if current == goal:
+#             if not path:
+#                 return 'S', 0
+#             first_move = path[0]
+#             dx = first_move[0] - start[0]
+#             dy = first_move[1] - start[1]
+#             if dx == -1: return 'U', len(path)
+#             if dx == 1:  return 'D', len(path)
+#             if dy == -1: return 'L', len(path)
+#             if dy == 1:  return 'R', len(path)
+        
+#         for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
+#             nx, ny = current[0] + dx, current[1] + dy
+#             next_pos = (nx, ny)
+
+#             if 0 <= nx < n_rows and 0 <= ny < n_cols and grid[nx][ny] == 0 and next_pos not in visited:
+#                 new_g = g + 1
+#                 new_f = new_g + manhattan(next_pos, goal)
+#                 heapq.heappush(open_set, (new_f, new_g, next_pos, path + [next_pos]))
+
+#     return 'S', 100000 
 
 class GreedyAgents:
 
@@ -99,10 +139,12 @@ class GreedyAgents:
     def update_inner_state(self, state):
         # Update robot positions and states
         for i in range(len(state['robots'])):
+            # trước
             prev = (self.robots[i][0], self.robots[i][1], self.robots[i][2])
+            # sau
             robot = state['robots'][i]
             self.robots[i] = (robot[0]-1, robot[1]-1, robot[2])
-            # print(i, self.robots[i])
+            print(i, self.robots[i])
             if prev[2] != 0:
                 if self.robots[i][2] == 0:
                     # Robot has dropped the package
@@ -111,8 +153,8 @@ class GreedyAgents:
                     self.robots_target[i] = self.robots[i][2]
         
         # Update package positions and states
-        self.packages += [(p[0], p[1]-1, p[2]-1, p[3]-1, p[4]-1, p[5]) for p in state['packages']]
-        self.packages_free += [True] * len(state['packages'])    
+        # self.packages += [(p[0], p[1]-1, p[2]-1, p[3]-1, p[4]-1, p[5]) for p in state['packages']]
+        # self.packages_free += [True] * len(state['packages'])    
 
     def get_actions(self, state):
         if self.is_init == False:
@@ -146,15 +188,19 @@ class GreedyAgents:
                 # Find the closest package
                 closest_package_id = None
                 closed_distance = 1000000
-                for j in range(len(self.packages)):
+                for j in np.arange(len(self.packages)):
+                    # nếu package đã được assign
                     if not self.packages_free[j]:
                         continue
-
+                    
+                    # manhattan distance
                     pkg = self.packages[j]                
                     d = abs(pkg[1]-self.robots[i][0]) + abs(pkg[2]-self.robots[i][1])
+                    # d += abs(pkg[1]-pkg[3]) + abs(pkg[2]-pkg[4])
                     if d < closed_distance:
                         closed_distance = d
                         closest_package_id = pkg[0]
+                    print('d =', d, 'closest =', closed_distance, 'package id = ', closest_package_id)
 
                 if closest_package_id is not None:
                     self.packages_free[closest_package_id-1] = False
@@ -163,6 +209,8 @@ class GreedyAgents:
                     actions.append((move, str(action)))
                 else:
                     actions.append(('S', '0'))
+
+                print(self.packages_free)
 
         print("N robots = ", len(self.robots))
         print("Actions = ", actions)

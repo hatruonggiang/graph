@@ -27,7 +27,6 @@ if __name__=="__main__":
     agents.init_agents(state)
     print(state)
     #env.render()
-    visualizer = RobotVisualizer(env, agents)
     done = False
     t = 0
     while not done:

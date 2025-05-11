@@ -32,13 +32,28 @@ class GridMapViewer:
                 else:
                     color = (255, 255, 255)
                     pygame.draw.rect(self.screen, color, rect)
-                    pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)  # border
+                    # pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)  # border
 
-                    # if isinstance(val, str) and val.startswith('R'):
+                    # if isinstance(val, str):
+                    #     if val.startswith('s'):
+                    #         text = self.font.render(, True, (0, 0, 255))
+                    #         text_rect = text.get_rect(center=rect.center)
+                    #         self.screen.blit(text, text_rect)
+
                     if isinstance(val, str):
+                        if val.startswith('S'):
+                            pygame.draw.rect(self.screen, (94, 235, 225), rect)
+                        elif val.startswith('T'):
+                            pygame.draw.rect(self.screen, (94, 235, 120), rect)
                         text = self.font.render(val, True, (0, 0, 255))
                         text_rect = text.get_rect(center=rect.center)
                         self.screen.blit(text, text_rect)
+
+                    # pygame.draw.rect(self.screen, color, rect)
+                    pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)  # border
+
+        map_text = self.font.render(f"Map {self.index + 1} / {len(self.grid_maps)}", True, (255, 0, 0))
+        self.screen.blit(map_text, (10, 10))
 
         pygame.display.flip()
 
@@ -54,9 +69,11 @@ class GridMapViewer:
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RIGHT:
-                        self.index = (self.index + 1) % len(self.grid_maps)
+                        if self.index < len(self.grid_maps) - 1:
+                            self.index += 1
                     elif event.key == pygame.K_LEFT:
-                        self.index = (self.index - 1) % len(self.grid_maps)
+                        if self.index > 0:
+                            self.index -= 1
 
             clock.tick(30)
 

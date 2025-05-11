@@ -369,16 +369,19 @@ class Environment:
         """
         # Make a deep copy of the grid
         grid_copy = [row[:] for row in self.grid]
-        for i, robot in enumerate(self.robots):
-            r, c = robot.position
-            grid_copy[r][c] = 'R%i'%i
+        
         for i, package in enumerate(self.packages):
             r1, c1 = package.start
             r2, c2 = package.target
-            grid_copy[r1][c1] = 'P%is'%i
-            grid_copy[r2][c2] = 'P%id'%i
-        for row in grid_copy:
-            print('\t'.join(str(cell) for cell in row))
+            grid_copy[r1][c1] = 'S%i'%i
+            grid_copy[r2][c2] = 'T%i'%i
+        for i, robot in enumerate(self.robots):
+            r, c = robot.position
+            if grid_copy[r][c] == 0:
+                grid_copy[r][c] = 'R%i'%i
+            else: grid_copy[r][c] += ' R%i'%i
+        # for row in grid_copy:
+        #     print('\t'.join(str(cell) for cell in row))
 
         return grid_copy
         
