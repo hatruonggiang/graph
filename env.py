@@ -189,6 +189,11 @@ class Environment:
         # For each robot, compute the new position based on the movement action.
         old_pos = {}
         next_pos = {}
+
+        # check vị trí mới của robots sau khi thực hiện actions
+        # update proposed_positions, old_pos, next_pos
+        # actions dẫn đến invalid position -> k thực hiện, new pos = old pos
+        # map từng vị trí trong grid với robot_id bằng dict
         for i, robot in enumerate(self.robots):
             move, pkg_act = actions[i]
             new_pos = self.compute_new_position(robot.position, move)
@@ -203,6 +208,8 @@ class Environment:
         computed_moved = [0 for _ in range(len(self.robots))]
         final_positions = [None] * len(self.robots)
         occupied = {}  # Dictionary to record occupied cells.
+        
+        #
         while True:
             updated = False
             for i in range(len(self.robots)):
@@ -214,8 +221,11 @@ class Environment:
                 new_pos = proposed_positions[i]
                 can_move = False
                 if new_pos not in old_pos:
+                    # new_pos != old_pos
                     can_move = True
                 else:
+                    # new_pos là old_pos của robot khác
+                    # phải chờ robot khác process xong mới quyết định
                     j = old_pos[new_pos]
                     if (j != i) and (computed_moved[j] == 0): # We must wait for the conflict resolve
                         continue
@@ -224,12 +234,14 @@ class Environment:
 
                 if can_move:
                     # print("Updated: ", i, new_pos)
+                    # new_pos k trùng với new_pos của robot khác
                     if new_pos not in occupied:
                         occupied[new_pos] = i
                         final_positions[i] = new_pos
                         computed_moved[i] = 1
                         moved_robots[i] = 1
                         updated = True
+                    # có trùng
                     else:
                         new_pos = pos
                         occupied[new_pos] = i
@@ -238,17 +250,22 @@ class Environment:
                         moved_robots[i] = 0
                         updated = True
 
+                # mỗi robot process xong thì break và lại loop
                 if updated:
                     break
-
+            
+            # k robots nào di chuyển được
             if not updated:
                 break
+
         #print("Computed postions: ", final_positions)
+        # can't move -> stay still
         for i in range(len(self.robots)):
             if computed_moved[i] == 0:
                 final_positions[i] = self.robots[i].position 
         
         # Update robot positions and apply movement cost when applicable.
+        # can move -> update new position + cost
         for i, robot in enumerate(self.robots):
             move, pkg_act = actions[i]
             if move in ['L', 'R', 'U', 'D'] and final_positions[i] != robot.position:
@@ -256,6 +273,8 @@ class Environment:
             robot.position = final_positions[i]
 
         # -------- Process Package Actions --------
+        # 1 -> chuyển status robot từ 'waiting' sang 'in transit'
+        # 2 -> chuyển status robot từ 'in transit' sang 'delivered'
         for i, robot in enumerate(self.robots):
             move, pkg_act = actions[i]
             #print(i, move, pkg_act)
@@ -353,8 +372,15 @@ class Environment:
         for i, robot in enumerate(self.robots):
             r, c = robot.position
             grid_copy[r][c] = 'R%i'%i
+        for i, package in enumerate(self.packages):
+            r1, c1 = package.start
+            r2, c2 = package.target
+            grid_copy[r1][c1] = 'P%is'%i
+            grid_copy[r2][c2] = 'P%id'%i
         for row in grid_copy:
             print('\t'.join(str(cell) for cell in row))
+
+        return grid_copy
         
 
 if __name__=="__main__":

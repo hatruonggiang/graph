@@ -1,0 +1,79 @@
+các file và các class/hàm trong file đó
+
+agent.py
+
+    Agents: 
+
+        __init__
+
+        init_agents(state)
+
+        get_actions(state)
+
+greedyagent.py
+
+    def run_bfs(map, start, goal): nó bfs từ goal về start rồi trả về 
+                                action đầu tiên trong path
+        return action: [U, D, L, R], distance: int (còn bn bước nữa để đến đích)
+        return 'S', 100000 nếu k đi được từ start đến goal
+        return 'S', 0 nếu start == goal?
+
+    GreedyAgents:
+
+        __init__():
+
+        init_agents(state):
+
+        update_move_to_target(robot_id, target_packet_id, phase='start):
+            phase = 'start' thì đi lấy package, 'target' thì đi giao package
+            distance >= 1 thì run_bfs và đi đến target
+            return move, str(pkg_act) #ví dụ như R, 1 hoặc D, 2
+
+        update_inner_state(state): update thông tin về robots và packages của agents thông qua state
+
+        get_actions(state): mệt vlu
+
+env.py
+
+    Robot:
+        __init__:
+        
+    Package:
+        __init__:
+
+    Environment:
+        __init__:
+
+        load_map(): k quan trọng lắm, để truyền self.map_file vào self.grid
+            return grid: list
+
+        is_free_cell(position): check có in-bound và là 0 không
+            return boolean
+
+        valid_position(postion): check xem có in-bound và khác 1 không
+            return boolean
+
+        add_robot(postion): free cell thì add Robot, append vào self.robots
+
+        compute_new_position(position, move): position + action > new pos
+
+        reset(): remove và khởi tạo ngẫu nhiên lại vị trí và số lượng robots và packages đã init
+            return self.get_state()
+
+        get_state(): trả về dict gồm time_step, map, robots và packages
+            return state
+
+        get_random_free_cell_p(): random chọn 1 free cell
+            return free_cell: (r, c)
+
+        get_random_free_cell(): random chọn 1 free cell và biến nó thành chướng ngại
+            return free_cell: (r, c), new_grid: list
+
+        check_terminate(postion, move): hết thời gian cho phép hoặc mọi packages đã được giao -> trả về True, còn package chưa giao -> False
+            return boolean
+
+        step(actions): update self.t, self.total_reward, vị trí và trạng thái các robots,
+            return self.get_state(), r: int (tổng reward trong phiên), done: boolean (giao hàng xong hết hoặc hết thời gian), infos: dict{total_reward, total_time_steps}
+
+        render(): render thành grid, map vị trí các robot thành 'R' + stt
+            hàm này chẳng trả về vẹo j chỉ in ra thôi, t thêm return để vẽ
