@@ -1,7 +1,7 @@
 from env import Environment
 #from agent import Agents
 from greedyagent import GreedyAgents as Agents
-from robotVisualizer import RobotVisualizer  # Import lớp RobotVisualizer
+from visualizer import GridMapViewer
 
 import numpy as np
 
@@ -27,18 +27,22 @@ if __name__=="__main__":
     agents.init_agents(state)
     print(state)
     #env.render()
-    visualizer = RobotVisualizer(env, agents)
+    viewer = GridMapViewer()
+
     done = False
     t = 0
+    
     while not done:
+        viewer.draw(env.grid, env.robots,env.packages, t)
+        viewer.wait_for_click()
+
         actions = agents.get_actions(state)
         next_state, reward, done, infos = env.step(actions)
         state = next_state
-        # visualizer.update(t)  # Cập nhật giao diện với bước thời gian hiện tại
-        # visualizer.run()  # Vẽ giao diện
-        env.render()
+        #env.render()
         t += 1
 
     print("Episode finished")
     print("Total reward:", infos['total_reward'])
     print("Total time steps:", infos['total_time_steps'])
+

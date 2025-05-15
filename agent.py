@@ -22,6 +22,7 @@ class Agents:
         """
             TODO:
         """
+        print('hehehe')
         list_actions = ['S', 'L', 'R', 'U', 'D']
         actions = []
         for i in range(self.n_robots):
