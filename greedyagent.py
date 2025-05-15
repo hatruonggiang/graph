@@ -1,5 +1,6 @@
 import numpy as np
 import heapq
+from scipy.optimize import linear_sum_assignment
 # Run a BFS to find the path from start to goal
 def run_bfs(map, start, goal):
     n_rows = len(map)
@@ -40,42 +41,6 @@ def run_bfs(map, start, goal):
 
 def manhattan(p1, p2):
     return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
-
-# def run_astar(map, start, goal):
-#     n_rows = len(map)
-#     n_cols = len(map[0])
-
-#     open_set = []
-#     heapq.heappush(open_set, (manhattan(start, goal), 0, start, []))  # (f, g, pos, path)
-#     visited = set()
-
-#     while open_set:
-#         f, g, current, path = heapq.heappop(open_set)
-#         if current in visited:
-#             continue
-#         visited.add(current)
-
-#         if current == goal:
-#             if not path:
-#                 return 'S', 0
-#             first_move = path[0]
-#             dx = first_move[0] - start[0]
-#             dy = first_move[1] - start[1]
-#             if dx == -1: return 'U', len(path)
-#             if dx == 1:  return 'D', len(path)
-#             if dy == -1: return 'L', len(path)
-#             if dy == 1:  return 'R', len(path)
-        
-#         for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
-#             nx, ny = current[0] + dx, current[1] + dy
-#             next_pos = (nx, ny)
-
-#             if 0 <= nx < n_rows and 0 <= ny < n_cols and grid[nx][ny] == 0 and next_pos not in visited:
-#                 new_g = g + 1
-#                 new_f = new_g + manhattan(next_pos, goal)
-#                 heapq.heappush(open_set, (new_f, new_g, next_pos, path + [next_pos]))
-
-#     return 'S', 100000 
 
 class GreedyAgents:
 
@@ -136,6 +101,57 @@ class GreedyAgents:
 
         return move, str(pkg_act)
     
+    
+    def package_assign(self):
+
+        timestep, grid, robots, packages = self.env.get_state()
+
+        available_packages = [
+            pkg for pkg in packages
+            if pkg[5] == 0 and timestep >= pkg[2]  # status=0 (chưa lấy), timestep >= start_time
+        ]
+        if not available_packages:
+            print('no packages available at the time')
+            return []  # Không có gói hàng để gán
+
+        # Lấy danh sách robot khả dụng (không mang gói hàng)
+        available_robots = [
+            i for i in range(self.num_agents)
+            if robots[i][1] is None  # carrying is None
+        ]
+        if not available_robots:
+            print('no robots available at the time')
+            return []  # Không có robot khả dụng
+        
+        num_assignments = min(len(available_robots), len(available_packages))
+        selected_packages = available_packages[:num_assignments]
+
+        # Tính ma trận chi phí
+        cost_matrix = np.zeros((len(available_robots), num_assignments))
+        for i, robot_idx in enumerate(available_robots):
+            robot_pos = robots[robot_idx][0]  # position (x, y)
+            for j, pkg in enumerate(selected_packages):
+                pkg_start = pkg.start  # start position (x, y)
+                pkg_target = pkg.target
+                # Khoảng cách Manhattan
+                cost_matrix[i, j] = abs(robot_pos[0] - pkg_start[0]) + abs(robot_pos[1] - pkg_start[1]) + \
+                                    abs(pkg_start[0] - pkg_target[0]) + abs(pkg_start[1] - pkg_start[1])
+
+        # Chạy Hungarian Algorithm
+        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+        # Tạo danh sách gán
+        assignments = []
+        for i, j in zip(row_ind, col_ind):
+            robot_idx = available_robots[i]
+            package_id = selected_packages[j][4]  # package id
+            assignments.append((robot_idx, package_id))
+            self.assignments[robot_idx] = package_id  # Lưu gán
+
+        return assignments
+
+
+
     def update_inner_state(self, state):
         # Update robot positions and states
         for i in range(len(state['robots'])):

@@ -257,6 +257,7 @@ class Environment:
             # k robots nào di chuyển được
             if not updated:
                 break
+                return None
 
         #print("Computed postions: ", final_positions)
         # can't move -> stay still
