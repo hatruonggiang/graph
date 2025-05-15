@@ -16,43 +16,40 @@ class Package:
 
 class Environment: 
 
-    def __init__(self, map_file, max_time_steps = 100, n_robots = 5, n_packages=20,
-             move_cost=-0.01, delivery_reward=10., delay_reward=1., 
-             seed=2025): 
-        """ Initializes the simulation environment. :param map_file: Path to the map text file. :param move_cost: Cost incurred when a robot moves (LRUD). :param delivery_reward: Reward for delivering a package on time. """ 
-        self.map_file = map_file
-        self.grid = self.load_map()
-        self.n_rows = len(self.grid)
-        self.n_cols = len(self.grid[0]) if self.grid else 0 
-        self.move_cost = move_cost 
-        self.delivery_reward = delivery_reward 
-        self.delay_reward = delay_reward
-        self.t = 0 
-        self.robots = [] # List of Robot objects.
-        self.packages = [] # List of Package objects.
-        self.total_reward = 0
-
-        self.n_robots = n_robots
-        self.max_time_steps = max_time_steps
-        self.n_packages = n_packages
-
-        self.rng = np.random.RandomState(seed)
-        self.reset()
-        self.done = False
-        self.state = None
+    def __init__(self, map_file, max_time_steps=100, n_robots=5, n_packages=20,
+                 move_cost=-0.005, delivery_reward=10.0, delay_reward=3.0, seed=2025):
+            """ Initializes the simulation environment. """
+            self.map_file = map_file
+            self.grid = self.load_map()
+            self.n_rows = len(self.grid)
+            self.n_cols = len(self.grid[0]) if self.grid else 0
+            self.move_cost = move_cost  # Giảm chi phí di chuyển
+            self.delivery_reward = delivery_reward
+            self.delay_reward = delay_reward  # Tăng thưởng giao trễ
+            self.t = 0
+            self.robots = []
+            self.packages = []
+            self.total_reward = 0
+            self.n_robots = n_robots
+            self.max_time_steps = max_time_steps
+            self.n_packages = n_packages
+            self.rng = np.random.RandomState(seed)
+            self.reset()
+            self.done = False
+            self.state = None
 
     def load_map(self):
-        """
-        Reads the map file and returns a 2D grid.
-        Assumes that each line in the file contains numbers separated by space.
-        0 indicates free cell and 1 indicates an obstacle.
-        """
+        """ Reads the map file and returns a 2D grid with random noise. """
         grid = []
         with open(self.map_file, 'r') as f:
             for line in f:
-                # Strip line breaks and split into numbers
                 row = [int(x) for x in line.strip().split(' ')]
                 grid.append(row)
+        # Thêm nhiễu: thay đổi 10% ô ngẫu nhiên
+        for i in range(len(grid)):
+            for j in range(len(grid[0])):
+                if self.rng.random() < 0.1:
+                    grid[i][j] = 1 if grid[i][j] == 0 else 0
         return grid
     
     def is_free_cell(self, position):
@@ -124,24 +121,16 @@ class Environment:
         return self.get_state()
     
     def get_state(self):
-        """
-        Returns the current state of the environment.
-        The state includes the positions of robots and packages.
-        :return: State representation.
-        """
-        selected_packages = []
-        for i in range(len(self.packages)):
-            if self.packages[i].start_time == self.t:
-                selected_packages.append(self.packages[i])
-                self.packages[i].status = 'waiting'
-
+        """ Returns the current state with all waiting or in-transit packages. """
+        selected_packages = [p for p in self.packages if p.status in ['waiting', 'in_transit'] or p.start_time == self.t]
+        for p in selected_packages:
+            if p.start_time == self.t and p.status == 'None':
+                p.status = 'waiting'
         state = {
             'time_step': self.t,
             'map': self.grid,
-            'robots': [(robot.position[0] + 1, robot.position[1] + 1,
-                        robot.carrying) for robot in self.robots],
-            'packages': [(package.package_id, package.start[0] + 1, package.start[1] + 1, 
-                          package.target[0] + 1, package.target[1] + 1, package.start_time, package.deadline) for package in selected_packages]
+            'robots': [(robot.position[0] + 1, robot.position[1] + 1, robot.carrying) for robot in self.robots],
+            'packages': [(p.package_id, p.start[0] + 1, p.start[1] + 1, p.target[0] + 1, p.target[1] + 1, p.start_time, p.deadline) for p in selected_packages]
         }
         return state
         
@@ -170,46 +159,30 @@ class Environment:
 
     
     def step(self, actions):
-        """
-        Advances the simulation by one timestep.
-        :param actions: A list where each element is a tuple (move_action, package_action) for a robot.
-            move_action: one of 'S', 'L', 'R', 'U', 'D'.
-            package_action: '1' (pickup), '2' (drop), or '0' (do nothing).
-        :return: The updated state and total accumulated reward.
-        """
+        """ Advances the simulation by one timestep with shaping rewards. """
         r = 0
         if len(actions) != len(self.robots):
             raise ValueError("The number of actions must match the number of robots.")
-
-        #print("Package env: ")
-        #print([p.status for p in self.packages])
-
-        # -------- Process Movement --------
         proposed_positions = []
-        # For each robot, compute the new position based on the movement action.
         old_pos = {}
         next_pos = {}
         for i, robot in enumerate(self.robots):
             move, pkg_act = actions[i]
             new_pos = self.compute_new_position(robot.position, move)
-            # Check if the new position is valid (inside bounds and not an obstacle).
             if not self.valid_position(new_pos):
-                new_pos = robot.position  # Invalid moves result in no change.
+                new_pos = robot.position
             proposed_positions.append(new_pos)
             old_pos[robot.position] = i
             next_pos[new_pos] = i
-
         moved_robots = [0 for _ in range(len(self.robots))]
         computed_moved = [0 for _ in range(len(self.robots))]
         final_positions = [None] * len(self.robots)
-        occupied = {}  # Dictionary to record occupied cells.
+        occupied = {}
         while True:
             updated = False
             for i in range(len(self.robots)):
-            
-                if computed_moved[i] != 0: 
+                if computed_moved[i] != 0:
                     continue
-
                 pos = self.robots[i].position
                 new_pos = proposed_positions[i]
                 can_move = False
@@ -217,13 +190,10 @@ class Environment:
                     can_move = True
                 else:
                     j = old_pos[new_pos]
-                    if (j != i) and (computed_moved[j] == 0): # We must wait for the conflict resolve
+                    if (j != i) and (computed_moved[j] == 0):
                         continue
-                    # We can decide where the robot can go now
                     can_move = True
-
                 if can_move:
-                    # print("Updated: ", i, new_pos)
                     if new_pos not in occupied:
                         occupied[new_pos] = i
                         final_positions[i] = new_pos
@@ -236,72 +206,71 @@ class Environment:
                         final_positions[i] = pos
                         computed_moved[i] = 1
                         moved_robots[i] = 0
+                        r -= 0.1  # Phạt khi robot kẹt do va chạm
                         updated = True
-
                 if updated:
                     break
-
             if not updated:
                 break
-        #print("Computed postions: ", final_positions)
         for i in range(len(self.robots)):
             if computed_moved[i] == 0:
-                final_positions[i] = self.robots[i].position 
-        
-        # Update robot positions and apply movement cost when applicable.
+                final_positions[i] = self.robots[i].position
         for i, robot in enumerate(self.robots):
             move, pkg_act = actions[i]
+            if robot.carrying == 0:
+                waiting_pkgs = [p for p in self.packages if p.status == 'waiting' and p.start_time <= self.t]
+                if waiting_pkgs:
+                    nearest_pkg = min(waiting_pkgs, key=lambda p: abs(p.start[0] - robot.position[0]) + abs(p.start[1] - robot.position[1]))
+                    dist = abs(nearest_pkg.start[0] - robot.position[0]) + abs(nearest_pkg.start[1] - robot.position[1])
+                    if move in ['L', 'R', 'U', 'D'] and final_positions[i] != robot.position:
+                        new_dist = abs(nearest_pkg.start[0] - final_positions[i][0]) + abs(nearest_pkg.start[1] - final_positions[i][1])
+                        if new_dist < dist:
+                            r += 0.1  # Thưởng tiến gần gói hàng
+            else:
+                pkg_id = robot.carrying
+                target = self.packages[pkg_id - 1].target
+                dist = abs(target[0] - robot.position[0]) + abs(target[1] - robot.position[1])
+                if move in ['L', 'R', 'U', 'D'] and final_positions[i] != robot.position:
+                    new_dist = abs(target[0] - final_positions[i][0]) + abs(target[1] - final_positions[i][1])
+                    if new_dist < dist:
+                        r += 0.1  # Thưởng tiến gần mục tiêu
             if move in ['L', 'R', 'U', 'D'] and final_positions[i] != robot.position:
                 r += self.move_cost
             robot.position = final_positions[i]
-
-        # -------- Process Package Actions --------
         for i, robot in enumerate(self.robots):
             move, pkg_act = actions[i]
-            #print(i, move, pkg_act)
-            # Pick up action.
             if pkg_act == '1':
                 if robot.carrying == 0:
-                    # Check for available packages at the current cell.
                     for j in range(len(self.packages)):
                         if self.packages[j].status == 'waiting' and self.packages[j].start == robot.position and self.packages[j].start_time <= self.t:
-                            # Pick the package with the smallest package_id.
                             package_id = self.packages[j].package_id
                             robot.carrying = package_id
                             self.packages[j].status = 'in_transit'
-                            # print(package_id, 'in transit')
                             break
-
-            # Drop action.
             elif pkg_act == '2':
                 if robot.carrying != 0:
                     package_id = robot.carrying
                     target = self.packages[package_id - 1].target
-                    # Check if the robot is at the target position.
                     if robot.position == target:
-                        # Update package status to delivered.
                         pkg = self.packages[package_id - 1]
                         pkg.status = 'delivered'
-                        # Apply reward based on whether the delivery is on time.
                         if self.t <= pkg.deadline:
                             r += self.delivery_reward
                         else:
-                            # Example: a reduced reward for late delivery.
                             r += self.delay_reward
-                        robot.carrying = 0  
-        
-        # Increment the simulation timestep.
+                        robot.carrying = 0
         self.t += 1
-
         self.total_reward += r
-
         done = False
         infos = {}
+        infos['no_package_steps'] = sum(1 for robot in self.robots if robot.carrying == 0)
+        infos['total_distance'] = sum(1 for i, (move, _) in enumerate(actions) if move in ['L', 'R', 'U', 'D'] and final_positions[i] != self.robots[i].position)
+        if infos['no_package_steps'] > 0:
+            r -= 0.05 * infos['no_package_steps'] / len(self.robots)  # Phạt khi không mang hàng
         if self.check_terminate():
             done = True
             infos['total_reward'] = self.total_reward
             infos['total_time_steps'] = self.t
-
         return self.get_state(), r, done, infos
     
     def check_terminate(self):
