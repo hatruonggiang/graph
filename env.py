@@ -71,7 +71,7 @@ class Environment:
         self.t = 0
         self.robots = []
         self.packages = []
-(self.total_reward = 0
+        self.total_reward = 0
         self.done = False
         self.state = None
         tmp_grid = np.array(self.grid)
